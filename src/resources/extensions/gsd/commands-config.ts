@@ -78,9 +78,9 @@ export async function handleConfig(ctx: ExtensionCommandContext): Promise<void> 
     if (toolIdx === -1) break;
 
     const tool = TOOL_KEYS[toolIdx];
-    const prompt = tool.prompt ?? `API key for ${tool.label} (${tool.hint}):`;
+    const promptMessage = tool.prompt ?? `API key for ${tool.label} (${tool.hint}):`;
     const input = await ctx.ui.input(
-      prompt,
+      promptMessage,
       "paste your key here",
     );
 

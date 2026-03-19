@@ -553,13 +553,14 @@ async function runWebSearchStep(
   const hasBrave = !!process.env.BRAVE_API_KEY || authStorage.has('brave')
   const hasTavily = !!process.env.TAVILY_API_KEY || authStorage.has('tavily')
   const hasSearxng = !!process.env.SEARXNG_BASE_URL || authStorage.has('searxng')
-  const existingSearch = hasBrave
-    ? 'Brave Search'
-    : hasTavily
-      ? 'Tavily'
-      : hasSearxng
-        ? 'SearXNG'
-        : null
+  let existingSearch: string | null = null
+  if (hasBrave) {
+    existingSearch = 'Brave Search'
+  } else if (hasTavily) {
+    existingSearch = 'Tavily'
+  } else if (hasSearxng) {
+    existingSearch = 'SearXNG'
+  }
 
   // Build options based on what's available
   type SearchOption = { value: string; label: string; hint?: string }

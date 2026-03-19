@@ -115,6 +115,16 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+function buildBudgetedContext(
+  results: TavilyResult[],
+  maxTokens: number,
+  scoreThreshold: number,
+  timed: { latencyMs: number; rateLimit?: RateLimitInfo },
+): { cached: CachedLLMContext; latencyMs: number; rateLimit?: RateLimitInfo } {
+  const cached = budgetContent(results, maxTokens, scoreThreshold);
+  return { cached, latencyMs: timed.latencyMs, rateLimit: timed.rateLimit };
+}
+
 /**
  * Distribute a token budget across Tavily results to build LLM context.
  *
@@ -280,9 +290,7 @@ async function executeOllamaLLMContext(
     score: 1.0, // Ollama doesn't provide scores, assume all are relevant
   }));
 
-  const cached = budgetContent(tavilyLikeResults, params.maxTokens, scoreThreshold);
-
-  return { cached, latencyMs: timed.latencyMs, rateLimit: timed.rateLimit };
+  return buildBudgetedContext(tavilyLikeResults, params.maxTokens, scoreThreshold, timed);
 }
 
 // =============================================================================
@@ -332,9 +340,7 @@ async function executeSearxngLLMContext(
       published_date: result.publishedDate ?? result.published_date ?? null,
     }));
 
-  const cached = budgetContent(tavilyLikeResults, params.maxTokens, scoreThreshold);
-
-  return { cached, latencyMs: timed.latencyMs, rateLimit: timed.rateLimit };
+  return buildBudgetedContext(tavilyLikeResults, params.maxTokens, scoreThreshold, timed);
 }
 
 // =============================================================================
