@@ -58,7 +58,7 @@ test('resolveSearchProvider returns tavily when only TAVILY_API_KEY is set', asy
   )
   const { authPath, cleanup } = makeTmpAuth()
   try {
-    withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, () => {
+    withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, () => {
       // Override preference read to use our temp auth (auto)
       const result = resolveSearchProvider('auto')
       assert.equal(result, 'tavily')
@@ -72,9 +72,19 @@ test('resolveSearchProvider returns brave when only BRAVE_API_KEY is set', async
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('auto')
     assert.equal(result, 'brave')
+  })
+})
+
+test('resolveSearchProvider returns searxng when only SEARXNG_BASE_URL is set', async () => {
+  const { resolveSearchProvider } = await import(
+    '../resources/extensions/search-the-web/provider.ts'
+  )
+  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: 'http://localhost:8080' }, () => {
+    const result = resolveSearchProvider('auto')
+    assert.equal(result, 'searxng')
   })
 })
 
@@ -82,7 +92,7 @@ test('resolveSearchProvider returns tavily when both keys set and preference is 
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('auto')
     assert.equal(result, 'tavily')
   })
@@ -92,7 +102,7 @@ test('resolveSearchProvider returns tavily when both keys set and preference is 
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('tavily')
     assert.equal(result, 'tavily')
   })
@@ -102,7 +112,7 @@ test('resolveSearchProvider returns brave when both keys set and preference is b
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('brave')
     assert.equal(result, 'brave')
   })
@@ -112,7 +122,7 @@ test('resolveSearchProvider returns null when neither key is set', async () => {
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined, OLLAMA_API_KEY: undefined }, () => {
+  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined, OLLAMA_API_KEY: undefined }, () => {
     const result = resolveSearchProvider('auto')
     assert.equal(result, null)
   })
@@ -122,7 +132,7 @@ test('resolveSearchProvider treats invalid preference as auto', async () => {
   const { resolveSearchProvider } = await import(
     '../resources/extensions/search-the-web/provider.ts'
   )
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('google')
     assert.equal(result, 'tavily', 'invalid preference falls back to auto → tavily first')
   })
@@ -133,12 +143,12 @@ test('resolveSearchProvider falls back to other provider when preferred key miss
     '../resources/extensions/search-the-web/provider.ts'
   )
   // Prefer tavily but only brave key exists → falls back to brave
-  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('tavily')
     assert.equal(result, 'brave', 'falls back to brave when tavily preferred but key missing')
   })
   // Prefer brave but only tavily key exists → falls back to tavily
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, () => {
     const result = resolveSearchProvider('brave')
     assert.equal(result, 'tavily', 'falls back to tavily when brave preferred but key missing')
   })
@@ -238,6 +248,30 @@ test('getBraveApiKey reads from process.env.BRAVE_API_KEY', async () => {
   })
   withEnv({ BRAVE_API_KEY: undefined }, () => {
     assert.equal(getBraveApiKey(), '')
+  })
+})
+
+test('getSearxngBaseUrl reads from process.env.SEARXNG_BASE_URL', async () => {
+  const { getSearxngBaseUrl } = await import(
+    '../resources/extensions/search-the-web/provider.ts'
+  )
+  withEnv({ SEARXNG_BASE_URL: 'http://localhost:8080' }, () => {
+    assert.equal(getSearxngBaseUrl(), 'http://localhost:8080')
+  })
+  withEnv({ SEARXNG_BASE_URL: undefined }, () => {
+    assert.equal(getSearxngBaseUrl(), '')
+  })
+})
+
+test('getSearxngApiKey reads from process.env.SEARXNG_API_KEY', async () => {
+  const { getSearxngApiKey } = await import(
+    '../resources/extensions/search-the-web/provider.ts'
+  )
+  withEnv({ SEARXNG_API_KEY: 'searxng-test-key' }, () => {
+    assert.equal(getSearxngApiKey(), 'searxng-test-key')
+  })
+  withEnv({ SEARXNG_API_KEY: undefined }, () => {
+    assert.equal(getSearxngApiKey(), '')
   })
 })
 

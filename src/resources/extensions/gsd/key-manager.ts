@@ -57,6 +57,7 @@ export const PROVIDER_REGISTRY: ProviderInfo[] = [
   // Search Providers
   { id: "tavily",    label: "Tavily Search",      category: "search", envVar: "TAVILY_API_KEY",  dashboardUrl: "tavily.com/app/api-keys" },
   { id: "brave",     label: "Brave Search",       category: "search", envVar: "BRAVE_API_KEY",   dashboardUrl: "brave.com/search/api" },
+  { id: "searxng",   label: "SearXNG",            category: "search", envVar: "SEARXNG_BASE_URL", dashboardUrl: "docs.searxng.org/admin/installation-docker.html" },
 
   // Remote Integrations
   { id: "discord_bot",  label: "Discord Bot",     category: "remote", envVar: "DISCORD_BOT_TOKEN" },

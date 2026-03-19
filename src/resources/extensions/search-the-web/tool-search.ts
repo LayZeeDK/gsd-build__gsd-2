@@ -1,5 +1,5 @@
 /**
- * search-the-web tool — Rich web search with full Brave API support.
+ * search-the-web tool — Rich web search with multi-provider support.
  *
  * v3 improvements:
  * - Structured error taxonomy (auth_error, rate_limited, network_error, etc.)
@@ -20,8 +20,8 @@ import { LRUTTLCache } from "./cache.js";
 import { fetchWithRetryTimed, fetchWithRetry, classifyError, type RateLimitInfo } from "./http.js";
 import { normalizeQuery, toDedupeKey, detectFreshness } from "./url-utils.js";
 import { formatSearchResults, type SearchResultFormatted, type FormatSearchOptions } from "./format.js";
-import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
-import { normalizeTavilyResult, mapFreshnessToTavily, type TavilySearchResponse } from "./tavily.js";
+import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, getSearxngBaseUrl, getSearxngApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
+import { normalizeTavilyResult, mapFreshnessToTavily, publishedDateToAge, type TavilySearchResponse } from "./tavily.js";
 
 // =============================================================================
 // Types
@@ -65,6 +65,21 @@ interface BraveSearchResponse {
   [key: string]: unknown;
 }
 
+interface SearxngSearchResult {
+  title?: string;
+  url?: string;
+  content?: string;
+  publishedDate?: string;
+  published_date?: string;
+  score?: number;
+  [key: string]: unknown;
+}
+
+interface SearxngSearchResponse {
+  results?: SearxngSearchResult[];
+  [key: string]: unknown;
+}
+
 interface CachedSearchResult {
   results: SearchResultFormatted[];
   summarizerKey?: string;
@@ -93,7 +108,7 @@ interface SearchDetails {
   errorKind?: string;
   error?: string;
   retryAfterMs?: number;
-  provider?: 'tavily' | 'brave' | 'ollama';
+  provider?: 'tavily' | 'brave' | 'searxng' | 'ollama';
 }
 
 // =============================================================================
@@ -180,6 +195,39 @@ async function fetchSummary(
   } catch {
     return null;
   }
+}
+
+/**
+ * Normalize a SearXNG result into our formatted result type.
+ */
+function normalizeSearxngResult(r: SearxngSearchResult): SearchResultFormatted | null {
+  if (!r.url) return null;
+  const published = r.publishedDate ?? r.published_date;
+  return {
+    title: r.title || "(untitled)",
+    url: r.url,
+    description: r.content || "",
+    age: published ? publishedDateToAge(published) : undefined,
+  };
+}
+
+/**
+ * Map Brave freshness string to SearXNG time_range.
+ */
+function mapFreshnessToSearxng(braveFreshness: string | null): string | null {
+  if (braveFreshness === null) return null;
+  const map: Record<string, string> = {
+    pd: "day",
+    pw: "week",
+    pm: "month",
+    py: "year",
+  };
+  return map[braveFreshness] ?? null;
+}
+
+function buildSearxngSearchUrl(baseUrl: string): URL {
+  const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  return new URL("search", normalized);
 }
 
 // =============================================================================
@@ -291,6 +339,59 @@ async function executeOllamaSearch(
 }
 
 // =============================================================================
+// SearXNG API execution
+// =============================================================================
+
+/**
+ * Execute a search against a SearXNG instance.
+ * Returns a CachedSearchResult with normalized, deduplicated results.
+ */
+async function executeSearxngSearch(
+  params: { query: string; freshness: string | null },
+  signal?: AbortSignal
+): Promise<{ results: CachedSearchResult; latencyMs: number; rateLimit?: RateLimitInfo }> {
+  const baseUrl = getSearxngBaseUrl();
+  const url = buildSearxngSearchUrl(baseUrl);
+  url.searchParams.set("q", params.query);
+  url.searchParams.set("format", "json");
+
+  const timeRange = mapFreshnessToSearxng(params.freshness);
+  if (timeRange) {
+    url.searchParams.set("time_range", timeRange);
+  }
+
+  const headers: Record<string, string> = {
+    "Accept": "application/json",
+  };
+  const apiKey = getSearxngApiKey();
+  if (apiKey) {
+    headers["X-API-Key"] = apiKey;
+  }
+
+  const timed = await fetchWithRetryTimed(url.toString(), {
+    method: "GET",
+    headers,
+    signal,
+  }, 2);
+
+  const data: SearxngSearchResponse = await timed.response.json();
+  const normalized = (data.results ?? [])
+    .map(normalizeSearxngResult)
+    .filter((result): result is SearchResultFormatted => !!result);
+  const deduplicated = deduplicateResults(normalized);
+
+  return {
+    results: {
+      results: deduplicated,
+      queryCorrected: false,
+      moreResultsAvailable: false,
+    },
+    latencyMs: timed.latencyMs,
+    rateLimit: timed.rateLimit,
+  };
+}
+
+// =============================================================================
 // Tool Registration
 // =============================================================================
 
@@ -299,7 +400,7 @@ export function registerSearchTool(pi: ExtensionAPI) {
     name: "search-the-web",
     label: "Web Search",
     description:
-      "Search the web using Brave Search API. Returns top results with titles, URLs, descriptions, " +
+      "Search the web using the configured provider (Brave, Tavily, SearXNG, or Ollama). Returns top results with titles, URLs, descriptions, " +
       "extra contextual snippets, result ages, and optional AI summary. " +
       "Supports freshness filtering, domain filtering, and auto-detects recency-sensitive queries.",
     promptSnippet: "Search the web for information",
@@ -345,7 +446,7 @@ export function registerSearchTool(pi: ExtensionAPI) {
       const provider = resolveSearchProvider();
       if (!provider) {
         return {
-          content: [{ type: "text", text: "Web search unavailable: No search API key is set. Use secure_env_collect to set TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY." }],
+          content: [{ type: "text", text: "Web search unavailable: No search API key is set. Use secure_env_collect to set SEARXNG_BASE_URL, TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY." }],
           isError: true,
           details: { errorKind: "auth_error", error: "No search API key set" } satisfies Partial<SearchDetails>,
         };
@@ -371,7 +472,7 @@ export function registerSearchTool(pi: ExtensionAPI) {
       // Handle domain filter (provider-specific)
       // ------------------------------------------------------------------
       let effectiveQuery = params.query;
-      if (provider === "brave" && params.domain) {
+      if ((provider === "brave" || provider === "searxng") && params.domain) {
         if (!effectiveQuery.toLowerCase().includes("site:")) {
           effectiveQuery = `site:${params.domain} ${effectiveQuery}`;
         }
@@ -470,6 +571,14 @@ export function registerSearchTool(pi: ExtensionAPI) {
           searchResult = tavilyResult.results;
           latencyMs = tavilyResult.latencyMs;
           rateLimit = tavilyResult.rateLimit;
+        } else if (provider === "searxng") {
+          const searxngResult = await executeSearxngSearch(
+            { query: effectiveQuery, freshness },
+            signal
+          );
+          searchResult = searxngResult.results;
+          latencyMs = searxngResult.latencyMs;
+          rateLimit = searxngResult.rateLimit;
         } else if (provider === "ollama") {
           const ollamaResult = await executeOllamaSearch(
             { query: params.query, count: 10 },

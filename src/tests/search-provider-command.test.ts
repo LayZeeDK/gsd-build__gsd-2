@@ -126,7 +126,7 @@ test('direct arg "tavily" sets preference and notifies', async () => {
   const { authPath, cleanup } = makeTmpAuth()
 
   try {
-    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, async () => {
+    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
       // Pre-set to auto so we can verify the change
       setSearchProviderPreference('auto', authPath)
 
@@ -155,7 +155,7 @@ test('direct arg "brave" sets preference and notifies', async () => {
   const { authPath, cleanup } = makeTmpAuth()
 
   try {
-    await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test' }, async () => {
+    await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, async () => {
       const ctx = makeMockCtx()
       await cmd.handler('brave', ctx)
 
@@ -178,7 +178,7 @@ test('direct arg "auto" sets preference and notifies', async () => {
   const { authPath, cleanup } = makeTmpAuth()
 
   try {
-    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, async () => {
+    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, async () => {
       const ctx = makeMockCtx()
       await cmd.handler('auto', ctx)
 
@@ -194,25 +194,49 @@ test('direct arg "auto" sets preference and notifies', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. No arg — shows select UI, user picks one
+// 4. Direct arg — searxng
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('no arg shows select UI with 3 options, user picks brave', async () => {
+test('direct arg "searxng" sets preference and notifies', async () => {
+  const cmd = await loadCommand()
+  const { authPath, cleanup } = makeTmpAuth()
+
+  try {
+    await withEnv({ SEARXNG_BASE_URL: 'http://localhost:8080', BRAVE_API_KEY: undefined, TAVILY_API_KEY: undefined }, async () => {
+      const ctx = makeMockCtx()
+      await cmd.handler('searxng', ctx)
+
+      assert.equal(ctx.ui.selectCalls.length, 0)
+      assert.equal(ctx.ui.notifyCalls.length, 1)
+      assert.match(ctx.ui.notifyCalls[0].message, /Search provider set to searxng/)
+      assert.match(ctx.ui.notifyCalls[0].message, /Effective provider: searxng/)
+    })
+  } finally {
+    cleanup()
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. No arg — shows select UI, user picks one
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('no arg shows select UI with 5 options, user picks brave', async () => {
   const cmd = await loadCommand()
 
-  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, async () => {
+  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, async () => {
     const ctx = makeMockCtx('brave (key: ✓)')
     await cmd.handler('', ctx)
 
     // Select UI shown
     assert.equal(ctx.ui.selectCalls.length, 1, 'should show select UI')
-    assert.equal(ctx.ui.selectCalls[0].options.length, 4)
+    assert.equal(ctx.ui.selectCalls[0].options.length, 5)
 
     // Options show key status
     assert.match(ctx.ui.selectCalls[0].options[0], /tavily \(key: ✓\)/)
     assert.match(ctx.ui.selectCalls[0].options[1], /brave \(key: ✓\)/)
-    assert.match(ctx.ui.selectCalls[0].options[2], /ollama \(key:/)
-    assert.equal(ctx.ui.selectCalls[0].options[3], 'auto')
+    assert.match(ctx.ui.selectCalls[0].options[2], /searxng \(url:/)
+    assert.match(ctx.ui.selectCalls[0].options[3], /ollama \(key:/)
+    assert.equal(ctx.ui.selectCalls[0].options[4], 'auto')
 
     // Title shows current preference
     assert.match(ctx.ui.selectCalls[0].title, /current:/)
@@ -224,7 +248,7 @@ test('no arg shows select UI with 3 options, user picks brave', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. Cancel (select returns undefined) — no side effects
+// 6. Cancel (select returns undefined) — no side effects
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('cancel (select returns undefined) produces no side effects', async () => {
@@ -235,7 +259,7 @@ test('cancel (select returns undefined) produces no side effects', async () => {
   const { authPath, cleanup } = makeTmpAuth()
 
   try {
-    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, async () => {
+    await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
       setSearchProviderPreference('tavily', authPath)
 
       // selectReturn = undefined simulates Esc
@@ -253,13 +277,13 @@ test('cancel (select returns undefined) produces no side effects', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 6. Invalid arg — falls back to interactive select
+// 7. Invalid arg — falls back to interactive select
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('invalid arg "google" falls back to interactive select', async () => {
   const cmd = await loadCommand()
 
-  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, async () => {
+  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
     const ctx = makeMockCtx('tavily (key: ✓)')
     await cmd.handler('google', ctx)
 
@@ -271,19 +295,19 @@ test('invalid arg "google" falls back to interactive select', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. Tab completion — all 3 options when prefix is empty
+// 8. Tab completion — all 5 options when prefix is empty
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('tab completion returns all 4 options when prefix is empty', async () => {
+test('tab completion returns all 5 options when prefix is empty', async () => {
   const cmd = await loadCommand()
 
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test' }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: 'BSA-test', SEARXNG_BASE_URL: undefined }, () => {
     const items = cmd.getArgumentCompletions!('')
     assert.ok(items, 'completions should not be null')
-    assert.equal(items!.length, 4)
+    assert.equal(items!.length, 5)
 
     const values = items!.map((i: any) => i.value)
-    assert.deepEqual(values, ['tavily', 'brave', 'ollama', 'auto'])
+    assert.deepEqual(values, ['tavily', 'brave', 'searxng', 'ollama', 'auto'])
 
     // Each item has label and description
     for (const item of items!) {
@@ -294,13 +318,13 @@ test('tab completion returns all 4 options when prefix is empty', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 8. Tab completion — filters by prefix
+// 9. Tab completion — filters by prefix
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('tab completion filters by prefix: "t" returns only tavily', async () => {
   const cmd = await loadCommand()
 
-  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, () => {
+  withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, () => {
     const items = cmd.getArgumentCompletions!('t')
     assert.ok(items)
     assert.equal(items!.length, 1)
@@ -309,14 +333,14 @@ test('tab completion filters by prefix: "t" returns only tavily', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 9. Notify message includes effective provider from resolveSearchProvider()
+// 10. Notify message includes effective provider from resolveSearchProvider()
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('notify message shows effective provider (fallback case)', async () => {
   const cmd = await loadCommand()
 
   // Set to brave but only tavily key exists → effective = tavily (fallback)
-  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined }, async () => {
+  await withEnv({ TAVILY_API_KEY: 'tvly-test', BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
     const ctx = makeMockCtx()
     await cmd.handler('brave', ctx)
 
@@ -328,13 +352,13 @@ test('notify message shows effective provider (fallback case)', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 10. Notify message shows "none" when no keys available
+// 11. Notify message shows "none" when no keys available
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('notify message shows "none" when no API keys available', async () => {
   const cmd = await loadCommand()
 
-  await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined }, async () => {
+  await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
     const ctx = makeMockCtx()
     await cmd.handler('auto', ctx)
 
@@ -344,24 +368,25 @@ test('notify message shows "none" when no API keys available', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 11. Select options show key unavailability (✗)
+// 12. Select options show key unavailability (✗)
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('select options show key unavailability with ✗', async () => {
   const cmd = await loadCommand()
 
-  await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined }, async () => {
+  await withEnv({ TAVILY_API_KEY: undefined, BRAVE_API_KEY: undefined, SEARXNG_BASE_URL: undefined }, async () => {
     const ctx = makeMockCtx('auto')
     await cmd.handler('', ctx)
 
     assert.equal(ctx.ui.selectCalls.length, 1)
     assert.match(ctx.ui.selectCalls[0].options[0], /tavily \(key: ✗\)/)
     assert.match(ctx.ui.selectCalls[0].options[1], /brave \(key: ✗\)/)
+    assert.match(ctx.ui.selectCalls[0].options[2], /searxng \(url: ✗\)/)
   })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 12. Command registered with correct name
+// 13. Command registered with correct name
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('command is registered as "search-provider"', async () => {

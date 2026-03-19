@@ -551,7 +551,14 @@ async function runWebSearchStep(
   // Check if web search is already configured
   const hasBrave = !!process.env.BRAVE_API_KEY || authStorage.has('brave')
   const hasTavily = !!process.env.TAVILY_API_KEY || authStorage.has('tavily')
-  const existingSearch = hasBrave ? 'Brave Search' : hasTavily ? 'Tavily' : null
+  const hasSearxng = !!process.env.SEARXNG_BASE_URL || authStorage.has('searxng')
+  const existingSearch = hasBrave
+    ? 'Brave Search'
+    : hasTavily
+      ? 'Tavily'
+      : hasSearxng
+        ? 'SearXNG'
+        : null
 
   // Build options based on what's available
   type SearchOption = { value: string; label: string; hint?: string }
@@ -572,6 +579,7 @@ async function runWebSearchStep(
   options.push(
     { value: 'brave', label: 'Brave Search', hint: 'requires API key — brave.com/search/api' },
     { value: 'tavily', label: 'Tavily', hint: 'requires API key — tavily.com' },
+    { value: 'searxng', label: 'SearXNG', hint: 'self-hosted (container) — base URL required' },
     { value: 'skip', label: 'Skip for now', hint: 'use /search-provider inside GSD later' },
   )
 
@@ -612,6 +620,35 @@ async function runWebSearchStep(
     process.env.TAVILY_API_KEY = trimmed
     p.log.success(`Web search: ${pc.green('Tavily')} configured`)
     return 'Tavily'
+  }
+
+  if (choice === 'searxng') {
+    const baseUrl = await p.text({
+      message: 'SearXNG base URL (e.g., http://localhost:8080):',
+      placeholder: 'http://localhost:8080',
+      validate: (value) => {
+        if (!value || !value.trim()) return 'Base URL is required'
+      },
+    })
+    if (p.isCancel(baseUrl) || !(baseUrl as string)?.trim()) return null
+    const trimmedUrl = (baseUrl as string).trim().replace(/\/+$/, '')
+    authStorage.set('searxng', { type: 'api_key', key: trimmedUrl })
+    process.env.SEARXNG_BASE_URL = trimmedUrl
+
+    const apiKey = await p.password({
+      message: `Optional SearXNG API key ${pc.dim('(press Enter to skip)')}:`,
+      mask: '●',
+    })
+    if (!p.isCancel(apiKey)) {
+      const trimmedKey = (apiKey as string | undefined)?.trim()
+      if (trimmedKey) {
+        authStorage.set('searxng_api_key', { type: 'api_key', key: trimmedKey })
+        process.env.SEARXNG_API_KEY = trimmedKey
+      }
+    }
+
+    p.log.success(`Web search: ${pc.green('SearXNG')} configured`)
+    return 'SearXNG'
   }
 
   return null
@@ -932,4 +969,3 @@ async function runDiscordChannelStep(p: ClackModule, pc: PicoModule, token: stri
   p.log.success(`Discord channel: ${pc.green(channelName ? `#${channelName}` : channelId)}`)
   return channelName ?? null
 }
-

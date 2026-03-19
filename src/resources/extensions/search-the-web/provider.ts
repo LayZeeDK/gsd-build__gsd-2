@@ -1,7 +1,7 @@
 /**
  * Search provider selection and preference management.
  *
- * Single source of truth for which search backend (Tavily vs Brave) to use.
+ * Single source of truth for which search backend (Tavily, Brave, SearXNG, or Ollama) to use.
  * Reads API keys from process.env at call time (not module load time) so
  * hot-reloaded keys work. Preference is stored in auth.json under the
  * synthetic provider key `search_provider` as { type: "api_key", key: "tavily" | "brave" | "auto" }.
@@ -19,10 +19,10 @@ import { resolveSearchProviderFromPreferences } from '../gsd/preferences.js'
 // where the relative import '../../../app-paths.ts' doesn't resolve.
 const authFilePath = join(homedir(), '.gsd', 'agent', 'auth.json')
 
-export type SearchProvider = 'tavily' | 'brave' | 'ollama'
+export type SearchProvider = 'tavily' | 'brave' | 'searxng' | 'ollama'
 export type SearchProviderPreference = SearchProvider | 'auto'
 
-const VALID_PREFERENCES = new Set<string>(['tavily', 'brave', 'ollama', 'auto'])
+const VALID_PREFERENCES = new Set<string>(['tavily', 'brave', 'searxng', 'ollama', 'auto'])
 const PREFERENCE_KEY = 'search_provider'
 
 /** Returns the Tavily API key from the environment, or empty string if not set. */
@@ -47,6 +47,16 @@ export function braveHeaders(): Record<string, string> {
 /** Returns the Ollama API key from the environment, or empty string if not set. */
 export function getOllamaApiKey(): string {
   return process.env.OLLAMA_API_KEY || ''
+}
+
+/** Returns the SearXNG base URL from the environment, or empty string if not set. */
+export function getSearxngBaseUrl(): string {
+  return process.env.SEARXNG_BASE_URL || ''
+}
+
+/** Returns the SearXNG API key from the environment, or empty string if not set. */
+export function getSearxngApiKey(): string {
+  return process.env.SEARXNG_API_KEY || ''
 }
 
 /**
@@ -84,8 +94,8 @@ export function setSearchProviderPreference(pref: SearchProviderPreference, auth
  * 1. If an explicit override is given, use it — but only if that provider's key exists.
  *    If the key doesn't exist, fall through to the other provider.
  * 2. Otherwise, read the stored preference.
- * 3. If preference is 'auto': prefer Tavily, then Brave.
- * 4. If preference is a specific provider: use it if key exists, else fall back to the other.
+ * 3. If preference is 'auto': prefer Tavily, then Brave, then SearXNG, then Ollama.
+ * 4. If preference is a specific provider: use it if key exists, else fall back to the other providers.
  * 5. Return null if neither key is available — explicit signal for "no provider".
  *
  * @param overridePreference — Optional override (e.g. from a tool parameter).
@@ -94,10 +104,12 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
   const tavilyKey = getTavilyApiKey()
   const braveKey = getBraveApiKey()
   const ollamaKey = getOllamaApiKey()
+  const searxngBaseUrl = getSearxngBaseUrl()
 
   const hasTavily = tavilyKey.length > 0
   const hasBrave = braveKey.length > 0
   const hasOllama = ollamaKey.length > 0
+  const hasSearxng = searxngBaseUrl.length > 0
 
   // Determine effective preference
   let pref: SearchProviderPreference
@@ -119,6 +131,7 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
   if (pref === 'auto') {
     if (hasTavily) return 'tavily'
     if (hasBrave) return 'brave'
+    if (hasSearxng) return 'searxng'
     if (hasOllama) return 'ollama'
     return null
   }
@@ -126,6 +139,7 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
   if (pref === 'tavily') {
     if (hasTavily) return 'tavily'
     if (hasBrave) return 'brave'
+    if (hasSearxng) return 'searxng'
     if (hasOllama) return 'ollama'
     return null
   }
@@ -133,6 +147,15 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
   if (pref === 'brave') {
     if (hasBrave) return 'brave'
     if (hasTavily) return 'tavily'
+    if (hasSearxng) return 'searxng'
+    if (hasOllama) return 'ollama'
+    return null
+  }
+
+  if (pref === 'searxng') {
+    if (hasSearxng) return 'searxng'
+    if (hasTavily) return 'tavily'
+    if (hasBrave) return 'brave'
     if (hasOllama) return 'ollama'
     return null
   }
@@ -141,6 +164,7 @@ export function resolveSearchProvider(overridePreference?: string): SearchProvid
     if (hasOllama) return 'ollama'
     if (hasTavily) return 'tavily'
     if (hasBrave) return 'brave'
+    if (hasSearxng) return 'searxng'
     return null
   }
 

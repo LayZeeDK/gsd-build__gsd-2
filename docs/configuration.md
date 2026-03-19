@@ -66,6 +66,8 @@ This opens an interactive wizard showing which keys are configured and which are
 |------|---------------------|---------|-----------|
 | Tavily Search | `TAVILY_API_KEY` | Web search for non-Anthropic models | [tavily.com/app/api-keys](https://tavily.com/app/api-keys) |
 | Brave Search | `BRAVE_API_KEY` | Web search for non-Anthropic models | [brave.com/search/api](https://brave.com/search/api) |
+| SearXNG (self-hosted) | `SEARXNG_BASE_URL` | Web search via your own SearXNG instance | [docs.searxng.org/admin/installation-docker.html](https://docs.searxng.org/admin/installation-docker.html) |
+| SearXNG API Key (optional) | `SEARXNG_API_KEY` | Optional auth header for protected SearXNG instances | [docs.searxng.org](https://docs.searxng.org/) |
 | Context7 Docs | `CONTEXT7_API_KEY` | Library documentation lookup | [context7.com/dashboard](https://context7.com/dashboard) |
 
 ### How it works
@@ -75,6 +77,10 @@ This opens an interactive wizard showing which keys are configured and which are
 3. Keys apply to all projects — no per-project setup required
 4. Environment variables (`export BRAVE_API_KEY=...`) take precedence over saved keys
 5. Anthropic models don't need Brave/Tavily — they have built-in web search
+
+### SearXNG setup
+
+GSD can use a self-hosted SearXNG instance for web search. The preferred setup is to run SearXNG in Docker (per the official installation docs) and then set `SEARXNG_BASE_URL` to the instance URL (for example, `http://localhost:8080`). If your SearXNG deployment requires an API key (or you route through an [Open WebUI SearXNG provider](https://docs.openwebui.com/features/chat-conversations/web-search/providers/searxng)), set `SEARXNG_API_KEY` to send the `X-API-Key` header on requests.
 
 ## All Settings
 

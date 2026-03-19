@@ -243,15 +243,17 @@ test("cache keys with same query, same freshness, different providers are distin
 });
 
 // =============================================================================
-// Test: No-key error mentions both TAVILY_API_KEY and BRAVE_API_KEY
+// Test: No-key error mentions all search provider keys
 // =============================================================================
 
-test("no-key error message contains both TAVILY_API_KEY and BRAVE_API_KEY", () => {
+test("no-key error message contains all search provider env vars", () => {
   // The error message is hardcoded in execute(), so we test the string directly
-  const errorMessage = "Web search unavailable: No search API key is set. Use secure_env_collect to set TAVILY_API_KEY or BRAVE_API_KEY.";
+  const errorMessage = "Web search unavailable: No search API key is set. Use secure_env_collect to set SEARXNG_BASE_URL, TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY.";
 
+  assert.ok(errorMessage.includes("SEARXNG_BASE_URL"), "Error must name SEARXNG_BASE_URL");
   assert.ok(errorMessage.includes("TAVILY_API_KEY"), "Error must name TAVILY_API_KEY");
   assert.ok(errorMessage.includes("BRAVE_API_KEY"), "Error must name BRAVE_API_KEY");
+  assert.ok(errorMessage.includes("OLLAMA_API_KEY"), "Error must name OLLAMA_API_KEY");
   assert.ok(errorMessage.includes("secure_env_collect"), "Error must mention secure_env_collect");
 });
 

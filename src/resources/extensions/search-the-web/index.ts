@@ -39,9 +39,11 @@
  * - Cache timer cleanup: purge timers use unref() to not block process exit
  *
  * Environment variables:
- *   BRAVE_API_KEY  — Optional with Anthropic models (built-in search available).
- *                    Required for non-Anthropic providers. Get one at brave.com/search/api
- *   JINA_API_KEY   — Optional. Higher rate limits for page extraction.
+ *   BRAVE_API_KEY     — Optional with Anthropic models (built-in search available).
+ *                       Required for non-Anthropic providers. Get one at brave.com/search/api
+ *   SEARXNG_BASE_URL  — Base URL for a SearXNG instance (e.g., http://localhost:8080)
+ *   SEARXNG_API_KEY   — Optional API key header for protected SearXNG instances
+ *   JINA_API_KEY      — Optional. Higher rate limits for page extraction.
  */
 
 import type { ExtensionAPI } from "@gsd/pi-coding-agent";

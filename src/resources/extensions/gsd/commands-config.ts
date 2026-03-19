@@ -14,13 +14,23 @@ import { join, dirname } from "node:path";
  * This is the source of truth for tool credentials - used by both the config wizard
  * and session startup to load keys from auth.json into environment variables.
  */
-export const TOOL_KEYS = [
+type ToolKeyConfig = {
+  id: string;
+  env: string;
+  label: string;
+  hint: string;
+  prompt?: string;
+};
+
+export const TOOL_KEYS: ToolKeyConfig[] = [
   { id: "tavily",   env: "TAVILY_API_KEY",   label: "Tavily Search",     hint: "tavily.com/app/api-keys" },
   { id: "brave",    env: "BRAVE_API_KEY",     label: "Brave Search",      hint: "brave.com/search/api" },
+  { id: "searxng",  env: "SEARXNG_BASE_URL",  label: "SearXNG Base URL",   hint: "http://localhost:8080", prompt: "Base URL for SearXNG (http://localhost:8080):" },
+  { id: "searxng_api_key", env: "SEARXNG_API_KEY", label: "SearXNG API Key", hint: "optional (if your instance requires auth)" },
   { id: "context7", env: "CONTEXT7_API_KEY",  label: "Context7 Docs",     hint: "context7.com/dashboard" },
   { id: "jina",     env: "JINA_API_KEY",      label: "Jina Page Extract", hint: "jina.ai/api" },
   { id: "groq",     env: "GROQ_API_KEY",      label: "Groq Voice",        hint: "console.groq.com" },
-] as const;
+];
 
 /**
  * Load tool API keys from auth.json into environment variables.
@@ -76,8 +86,9 @@ export async function handleConfig(ctx: ExtensionCommandContext): Promise<void> 
     if (toolIdx === -1) break;
 
     const tool = TOOL_KEYS[toolIdx];
+    const prompt = tool.prompt ?? `API key for ${tool.label} (${tool.hint}):`;
     const input = await ctx.ui.input(
-      `API key for ${tool.label} (${tool.hint}):`,
+      prompt,
       "paste your key here",
     );
 
