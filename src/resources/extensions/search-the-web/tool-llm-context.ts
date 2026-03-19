@@ -30,6 +30,7 @@ import { formatLLMContext, type LLMContextSnippet, type LLMContextSource } from 
 import type { TavilyResult, TavilySearchResponse } from "./tavily.js";
 import { publishedDateToAge } from "./tavily.js";
 import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, getSearxngBaseUrl, getSearxngApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
+import { buildSearxngSearchUrl } from "./searxng.js";
 
 // =============================================================================
 // Types
@@ -114,11 +115,6 @@ contextCache.startPurgeInterval(60_000);
 /** Rough token estimate: ~4 chars per token for English text. */
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
-}
-
-function buildSearxngSearchUrl(baseUrl: string): URL {
-  const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return new URL("search", normalized);
 }
 
 /**

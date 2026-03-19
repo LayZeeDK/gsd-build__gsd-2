@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path'
 import type { AuthStorage } from '@gsd/pi-coding-agent'
 import { renderLogo } from './logo.js'
 import { agentDir } from './app-paths.js'
+import { normalizeSearxngBaseUrl } from './resources/extensions/search-the-web/searxng.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -631,7 +632,7 @@ async function runWebSearchStep(
       },
     })
     if (p.isCancel(baseUrl) || !(baseUrl as string)?.trim()) return null
-    const trimmedUrl = (baseUrl as string).trim().replace(/\/+$/, '')
+    const trimmedUrl = normalizeSearxngBaseUrl(baseUrl as string)
     authStorage.set('searxng', { type: 'api_key', key: trimmedUrl })
     process.env.SEARXNG_BASE_URL = trimmedUrl
 

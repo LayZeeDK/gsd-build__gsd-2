@@ -22,6 +22,7 @@ import { normalizeQuery, toDedupeKey, detectFreshness } from "./url-utils.js";
 import { formatSearchResults, type SearchResultFormatted, type FormatSearchOptions } from "./format.js";
 import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, getSearxngBaseUrl, getSearxngApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
 import { normalizeTavilyResult, mapFreshnessToTavily, publishedDateToAge, type TavilySearchResponse } from "./tavily.js";
+import { buildSearxngSearchUrl, mapFreshnessToSearxng } from "./searxng.js";
 
 // =============================================================================
 // Types
@@ -209,25 +210,6 @@ function normalizeSearxngResult(r: SearxngSearchResult): SearchResultFormatted |
     description: r.content || "",
     age: published ? publishedDateToAge(published) : undefined,
   };
-}
-
-/**
- * Map Brave freshness string to SearXNG time_range.
- */
-function mapFreshnessToSearxng(braveFreshness: string | null): string | null {
-  if (braveFreshness === null) return null;
-  const map: Record<string, string> = {
-    pd: "day",
-    pw: "week",
-    pm: "month",
-    py: "year",
-  };
-  return map[braveFreshness] ?? null;
-}
-
-function buildSearxngSearchUrl(baseUrl: string): URL {
-  const normalized = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return new URL("search", normalized);
 }
 
 // =============================================================================
