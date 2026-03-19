@@ -22,7 +22,13 @@ export const TOOL_KEYS = [
   { id: "context7", env: "CONTEXT7_API_KEY",  label: "Context7 Docs",     hint: "context7.com/dashboard" },
   { id: "jina",     env: "JINA_API_KEY",      label: "Jina Page Extract", hint: "jina.ai/api" },
   { id: "groq",     env: "GROQ_API_KEY",      label: "Groq Voice",        hint: "console.groq.com" },
-] as const;
+] satisfies ReadonlyArray<{
+  id: string;
+  env: string;
+  label: string;
+  hint: string;
+  prompt?: string;
+}>;
 
 /**
  * Load tool API keys from auth.json into environment variables.
