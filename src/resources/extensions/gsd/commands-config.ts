@@ -14,15 +14,7 @@ import { join, dirname } from "node:path";
  * This is the source of truth for tool credentials - used by both the config wizard
  * and session startup to load keys from auth.json into environment variables.
  */
-type ToolKeyConfig = {
-  id: string;
-  env: string;
-  label: string;
-  hint: string;
-  prompt?: string;
-};
-
-export const TOOL_KEYS: ToolKeyConfig[] = [
+export const TOOL_KEYS = [
   { id: "tavily",   env: "TAVILY_API_KEY",   label: "Tavily Search",     hint: "tavily.com/app/api-keys" },
   { id: "brave",    env: "BRAVE_API_KEY",     label: "Brave Search",      hint: "brave.com/search/api" },
   { id: "searxng",  env: "SEARXNG_BASE_URL",  label: "SearXNG Base URL",   hint: "http://localhost:8080", prompt: "Base URL for SearXNG:" },
@@ -30,7 +22,7 @@ export const TOOL_KEYS: ToolKeyConfig[] = [
   { id: "context7", env: "CONTEXT7_API_KEY",  label: "Context7 Docs",     hint: "context7.com/dashboard" },
   { id: "jina",     env: "JINA_API_KEY",      label: "Jina Page Extract", hint: "jina.ai/api" },
   { id: "groq",     env: "GROQ_API_KEY",      label: "Groq Voice",        hint: "console.groq.com" },
-];
+] as const;
 
 /**
  * Load tool API keys from auth.json into environment variables.

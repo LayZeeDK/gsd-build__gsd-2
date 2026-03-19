@@ -629,6 +629,13 @@ async function runWebSearchStep(
       placeholder: 'http://localhost:8080',
       validate: (value) => {
         if (!value || !value.trim()) return 'Base URL is required'
+        const trimmed = value.trim()
+        if (!/^https?:\/\//i.test(trimmed)) return 'Base URL must start with http:// or https://'
+        try {
+          new URL(trimmed)
+        } catch {
+          return 'Base URL must be a valid URL'
+        }
       },
     })
     if (p.isCancel(baseUrl) || !(baseUrl as string)?.trim()) return null
