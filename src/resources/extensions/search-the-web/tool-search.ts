@@ -73,12 +73,10 @@ interface SearxngSearchResult {
   publishedDate?: string;
   published_date?: string;
   score?: number;
-  [key: string]: unknown;
 }
 
 interface SearxngSearchResponse {
   results?: SearxngSearchResult[];
-  [key: string]: unknown;
 }
 
 interface CachedSearchResult {
