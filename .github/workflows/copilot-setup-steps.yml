@@ -37,3 +37,130 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Prepare SearXNG CA bundle + settings
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/searxng
+
+          BASE_CA_SOURCE="${SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}"
+          if [ ! -f "$BASE_CA_SOURCE" ]; then
+            BASE_CA_SOURCE="/etc/ssl/certs/ca-certificates.crt"
+          fi
+
+          cat "$BASE_CA_SOURCE" > /tmp/searxng/ca-certificates.crt
+          : > /tmp/searxng/extra-ca.crt
+          for EXTRA_CA_SOURCE in "${REQUESTS_CA_BUNDLE:-}" "${NODE_EXTRA_CA_CERTS:-}" "${CURL_CA_BUNDLE:-}"; do
+            if [ -n "$EXTRA_CA_SOURCE" ] && [ -f "$EXTRA_CA_SOURCE" ] && [ "$EXTRA_CA_SOURCE" != "$BASE_CA_SOURCE" ]; then
+              cat "$EXTRA_CA_SOURCE" >> /tmp/searxng/ca-certificates.crt
+              cat "$EXTRA_CA_SOURCE" >> /tmp/searxng/extra-ca.crt
+            fi
+          done
+
+          cat > /tmp/searxng/settings.yml <<'EOF'
+          use_default_settings: true
+          search:
+            formats:
+              - html
+              - json
+          server:
+            bind_address: "0.0.0.0"
+            port: 8080
+            secret_key: "copilot-searxng-secret"
+            limiter: false
+            public_instance: false
+            method: "GET"
+          outgoing:
+            verify: /etc/ssl/certs/ca-certificates.crt
+          EOF
+
+          {
+            echo "SEARXNG_BASE_URL=http://localhost:8080"
+            echo "NODE_EXTRA_CA_CERTS=/tmp/searxng/ca-certificates.crt"
+            echo "NODE_EXTRACA_CERTS=/tmp/searxng/ca-certificates.crt"
+            echo "REQUESTS_CA_BUNDLE=/tmp/searxng/ca-certificates.crt"
+            echo "SSL_CERT_FILE=/tmp/searxng/ca-certificates.crt"
+          } >> "$GITHUB_ENV"
+
+      - name: Start SearXNG container
+        run: |
+          set -euo pipefail
+          docker pull searxng/searxng:latest
+          docker run -d --name searxng -p 8080:8080 \
+            -v /tmp/searxng/settings.yml:/etc/searxng/settings.yml \
+            -v /tmp/searxng/extra-ca.crt:/usr/local/share/ca-certificates/copilot-extra.crt:ro \
+            -e REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+            -e SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+            -e CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+            searxng/searxng:latest
+
+      - name: Wait for SearXNG to be ready
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            if curl -fsS "http://localhost:8080/search?q=ready&format=json" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs searxng
+          exit 1
+
+      - name: Verify SearXNG direct search (no TLS errors)
+        run: |
+          set -euo pipefail
+          curl -fsS "http://localhost:8080/search?q=open+source&format=json" -o /tmp/searxng/direct.json
+          python - <<'PY'
+          import json
+          with open("/tmp/searxng/direct.json", "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+          if "results" not in data:
+            raise SystemExit("SearXNG response missing results")
+          print(f"Direct SearXNG results: {len(data.get('results', []))}")
+          PY
+          if docker logs searxng | grep -q "CERTIFICATE_VERIFY_FAILED"; then
+            echo "SearXNG logs show CERTIFICATE_VERIFY_FAILED"
+            exit 1
+          fi
+
+      - name: Verify SearXNG via gsd search tool
+        run: |
+          set -euo pipefail
+          node --import ./src/resources/extensions/gsd/tests/resolve-ts.mjs --experimental-strip-types --input-type=module <<'NODE'
+          import { registerSearchTool } from './src/resources/extensions/search-the-web/tool-search.ts'
+
+          const tools = new Map()
+          const pi = {
+            registerTool(def) {
+              tools.set(def.name, def)
+            },
+          }
+
+          registerSearchTool(pi)
+          const tool = tools.get('search-the-web')
+          if (!tool) {
+            throw new Error('search-the-web tool not registered')
+          }
+
+          const result = await tool.execute(
+            'tool-call',
+            { query: 'open source software', count: 1 },
+            undefined,
+            undefined,
+            {}
+          )
+
+          if (result?.isError) {
+            throw new Error(`search-the-web failed: ${result?.details?.error ?? 'unknown error'}`)
+          }
+
+          const details = result?.details
+          if (!details || details.provider !== 'searxng') {
+            throw new Error(`Expected searxng provider, got ${details?.provider ?? 'unknown'}`)
+          }
+          console.log(`GSD search tool provider: ${details.provider}`)
+          NODE
+          if docker logs searxng | grep -q "CERTIFICATE_VERIFY_FAILED"; then
+            echo "SearXNG logs show CERTIFICATE_VERIFY_FAILED"
+            exit 1
+          fi
