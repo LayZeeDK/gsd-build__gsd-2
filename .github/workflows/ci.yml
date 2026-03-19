@@ -121,8 +121,10 @@ jobs:
             raise SystemExit("SearXNG response missing results")
           print(f"Direct SearXNG results: {len(data.get('results', []))}")
           PY
-          if docker logs searxng | grep -q "CERTIFICATE_VERIFY_FAILED"; then
+          docker logs searxng > /tmp/searxng/container.log 2>&1 || true
+          if grep -q "CERTIFICATE_VERIFY_FAILED" /tmp/searxng/container.log; then
             echo "SearXNG logs show CERTIFICATE_VERIFY_FAILED"
+            tail -n 200 /tmp/searxng/container.log
             exit 1
           fi
 
@@ -169,8 +171,10 @@ jobs:
           }
           console.log(`GSD search tool provider: ${details.provider}`)
           NODE
-          if docker logs searxng | grep -q "CERTIFICATE_VERIFY_FAILED"; then
+          docker logs searxng > /tmp/searxng/container.log 2>&1 || true
+          if grep -q "CERTIFICATE_VERIFY_FAILED" /tmp/searxng/container.log; then
             echo "SearXNG logs show CERTIFICATE_VERIFY_FAILED"
+            tail -n 200 /tmp/searxng/container.log
             exit 1
           fi
 
