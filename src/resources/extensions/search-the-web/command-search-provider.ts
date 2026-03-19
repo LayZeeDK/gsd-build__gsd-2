@@ -3,7 +3,7 @@
  *
  * Lets users switch between tavily, brave, searxng, ollama, and auto search backends.
  * Supports direct arg (`/search-provider tavily`) or interactive select UI.
- * Tab completion provides the three valid options with key status.
+ * Tab completion provides the valid options with key status.
  *
  * All provider logic lives in provider.ts (S01) — this is pure UI wiring.
  */

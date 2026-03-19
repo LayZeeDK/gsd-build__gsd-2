@@ -10,8 +10,7 @@ export function normalizeSearxngBaseUrl(baseUrl: string): string {
 /** Build the SearXNG search endpoint URL from a base URL. */
 export function buildSearxngSearchUrl(baseUrl: string): URL {
   const normalized = normalizeSearxngBaseUrl(baseUrl);
-  const withSlash = normalized.endsWith("/") ? normalized : `${normalized}/`;
-  return new URL("search", withSlash);
+  return new URL("search", `${normalized}/`);
 }
 
 /** Map Brave freshness string to SearXNG time_range. */

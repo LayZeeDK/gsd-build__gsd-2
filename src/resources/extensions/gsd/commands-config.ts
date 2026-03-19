@@ -25,7 +25,7 @@ type ToolKeyConfig = {
 export const TOOL_KEYS: ToolKeyConfig[] = [
   { id: "tavily",   env: "TAVILY_API_KEY",   label: "Tavily Search",     hint: "tavily.com/app/api-keys" },
   { id: "brave",    env: "BRAVE_API_KEY",     label: "Brave Search",      hint: "brave.com/search/api" },
-  { id: "searxng",  env: "SEARXNG_BASE_URL",  label: "SearXNG Base URL",   hint: "http://localhost:8080", prompt: "Base URL for SearXNG (http://localhost:8080):" },
+  { id: "searxng",  env: "SEARXNG_BASE_URL",  label: "SearXNG Base URL",   hint: "http://localhost:8080", prompt: "Base URL for SearXNG:" },
   { id: "searxng_api_key", env: "SEARXNG_API_KEY", label: "SearXNG API Key", hint: "optional (if your instance requires auth)" },
   { id: "context7", env: "CONTEXT7_API_KEY",  label: "Context7 Docs",     hint: "context7.com/dashboard" },
   { id: "jina",     env: "JINA_API_KEY",      label: "Jina Page Extract", hint: "jina.ai/api" },
