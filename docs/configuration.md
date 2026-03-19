@@ -82,6 +82,29 @@ This opens an interactive wizard showing which keys are configured and which are
 
 GSD can use a self-hosted SearXNG instance for web search. The preferred setup is to run SearXNG in Docker (per the official installation docs) and then set `SEARXNG_BASE_URL` to the instance URL (for example, `http://localhost:8080`). If your SearXNG deployment requires an API key (or you route through an [Open WebUI SearXNG provider](https://docs.openwebui.com/features/chat-conversations/web-search/providers/searxng)), set `SEARXNG_API_KEY` to send the `X-API-Key` header on requests.
 
+### SearXNG TLS / certificate errors
+
+If SearXNG logs `SSL: CERTIFICATE_VERIFY_FAILED (self-signed certificate in certificate chain)` when it queries upstream engines, your environment is likely doing TLS inspection or uses a custom root CA. Fix this by supplying that CA to SearXNG via its `settings.yml`, mounted into the container. If your environment already exposes a CA bundle (for example `NODE_EXTRA_CA_CERTS` or `REQUESTS_CA_BUNDLE`), mount that file and point `outgoing.verify` at it.
+
+Example snippet:
+
+```yaml
+outgoing:
+  # Point to a CA bundle mounted into the container.
+  verify: /etc/searxng/ca-certificates.crt
+```
+
+Docker example (mount both settings and the CA bundle):
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v /path/to/settings.yml:/etc/searxng/settings.yml:ro \
+  -v /path/to/ca-certificates.crt:/etc/searxng/ca-certificates.crt:ro \
+  searxng/searxng:latest
+```
+
+As a last resort (less secure), you can set `outgoing.verify: false` in `settings.yml` to disable TLS verification.
+
 ## All Settings
 
 ### `models`
