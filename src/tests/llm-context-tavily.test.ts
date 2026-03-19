@@ -309,12 +309,14 @@ test("cache key with |p:tavily differs from |p:brave for same query", () => {
   assert.ok(tavilyKey.endsWith("|p:tavily"), "Tavily cache key ends with |p:tavily");
 });
 
-test("no-key error message mentions both TAVILY_API_KEY and BRAVE_API_KEY", () => {
+test("no-key error message mentions all search provider env vars", () => {
   // This mirrors the error string that will be returned when no provider is resolved
-  const errorMessage = "search_and_read unavailable: No search API key is set. Use secure_env_collect to set TAVILY_API_KEY or BRAVE_API_KEY.";
+  const errorMessage = "search_and_read unavailable: No search API key is set. Use secure_env_collect to set SEARXNG_BASE_URL, TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY.";
 
+  assert.ok(errorMessage.includes("SEARXNG_BASE_URL"), "Error must mention SEARXNG_BASE_URL");
   assert.ok(errorMessage.includes("TAVILY_API_KEY"), "Error must mention TAVILY_API_KEY");
   assert.ok(errorMessage.includes("BRAVE_API_KEY"), "Error must mention BRAVE_API_KEY");
+  assert.ok(errorMessage.includes("OLLAMA_API_KEY"), "Error must mention OLLAMA_API_KEY");
   assert.ok(errorMessage.includes("secure_env_collect"), "Error must mention secure_env_collect");
 });
 

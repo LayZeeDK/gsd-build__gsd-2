@@ -1,0 +1,107 @@
+name: "Copilot Setup Steps"
+
+# Automatically run the setup steps when they are changed to allow for easy validation, and
+# allow manual testing through the repository's "Actions" tab
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Copilot will be given its own token for its operations.
+    permissions:
+      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission.
+      # If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
+      contents: read
+
+    # You can define any steps you want, and they will run before the agent starts.
+    # If you do not check out your code, Copilot will do this for you.
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare SearXNG CA bundle + settings
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/searxng
+
+          BASE_CA_SOURCE="${SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}"
+          if [ ! -f "$BASE_CA_SOURCE" ]; then
+            BASE_CA_SOURCE="/etc/ssl/certs/ca-certificates.crt"
+          fi
+
+          cat "$BASE_CA_SOURCE" > /tmp/searxng/ca-certificates.crt
+          : > /tmp/searxng/extra-ca.crt
+          for EXTRA_CA_SOURCE in "${REQUESTS_CA_BUNDLE:-}" "${NODE_EXTRA_CA_CERTS:-}" "${CURL_CA_BUNDLE:-}"; do
+            if [ -n "$EXTRA_CA_SOURCE" ] && [ -f "$EXTRA_CA_SOURCE" ] && [ "$EXTRA_CA_SOURCE" != "$BASE_CA_SOURCE" ]; then
+              cat "$EXTRA_CA_SOURCE" >> /tmp/searxng/ca-certificates.crt
+              cat "$EXTRA_CA_SOURCE" >> /tmp/searxng/extra-ca.crt
+            fi
+          done
+
+          cat > /tmp/searxng/settings.yml <<'EOF'
+          use_default_settings: true
+          search:
+            formats:
+              - html
+              - json
+          server:
+            bind_address: "0.0.0.0"
+            port: 8080
+            secret_key: "copilot-searxng-secret"
+            limiter: false
+            public_instance: false
+            method: "GET"
+          outgoing:
+            verify: /etc/ssl/certs/ca-certificates.crt
+          EOF
+
+          {
+            echo "SEARXNG_BASE_URL=http://localhost:8080"
+            echo "NODE_EXTRA_CA_CERTS=/tmp/searxng/ca-certificates.crt"
+            echo "NODE_EXTRACA_CERTS=/tmp/searxng/ca-certificates.crt"
+            echo "REQUESTS_CA_BUNDLE=/tmp/searxng/ca-certificates.crt"
+            echo "SSL_CERT_FILE=/tmp/searxng/ca-certificates.crt"
+          } >> "$GITHUB_ENV"
+
+      - name: Start SearXNG container
+        run: |
+          set -euo pipefail
+          docker pull searxng/searxng:latest
+          docker run -d --name searxng -p 8080:8080 \
+            -v /tmp/searxng/settings.yml:/etc/searxng/settings.yml \
+            -v /tmp/searxng/extra-ca.crt:/usr/local/share/ca-certificates/copilot-extra.crt:ro \
+            -e REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+            -e SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+            -e CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+            searxng/searxng:latest
+
+      - name: Wait for SearXNG to be ready
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            if curl -fsS "http://localhost:8080/search?q=ready&format=json" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs searxng
+          exit 1

@@ -4,7 +4,7 @@ const SUBCOMMAND_HELP: Record<string, string> = {
     '',
     'Re-run the interactive setup wizard to configure:',
     '  - LLM provider (Anthropic, OpenAI, Google, etc.)',
-    '  - Web search provider (Brave, Tavily, built-in)',
+    '  - Web search provider (Brave, Tavily, SearXNG, built-in)',
     '  - Remote questions (Discord, Slack, Telegram)',
     '  - Tool API keys (Context7, Jina, Groq)',
     '',

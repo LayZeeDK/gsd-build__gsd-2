@@ -5,9 +5,11 @@
  * Unlike search-the-web → fetch_page (two steps), this returns pre-extracted,
  * relevance-scored page content in one API call.
  *
- * Supports two backends:
+ * Supports multiple backends:
  * - Tavily: POST-based, client-side token budgeting via budgetContent()
  * - Brave: GET-based LLM Context API with server-side budgeting
+ * - SearXNG: JSON results mapped into lightweight snippets
+ * - Ollama: Web search API with client-side token budgeting
  *
  * Provider is selected by resolveSearchProvider() — same as tool-search.ts.
  *
@@ -27,7 +29,8 @@ import { normalizeQuery, extractDomain } from "./url-utils.js";
 import { formatLLMContext, type LLMContextSnippet, type LLMContextSource } from "./format.js";
 import type { TavilyResult, TavilySearchResponse } from "./tavily.js";
 import { publishedDateToAge } from "./tavily.js";
-import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
+import { getTavilyApiKey, getOllamaApiKey, getBraveApiKey, getSearxngBaseUrl, getSearxngApiKey, braveHeaders, resolveSearchProvider } from "./provider.js";
+import { buildSearxngSearchUrl } from "./searxng.js";
 
 // =============================================================================
 // Types
@@ -60,6 +63,19 @@ interface BraveLLMContextResponse {
   }>;
 }
 
+interface SearxngSearchResult {
+  title?: string;
+  url?: string;
+  content?: string;
+  publishedDate?: string;
+  published_date?: string;
+  score?: number;
+}
+
+interface SearxngSearchResponse {
+  results?: SearxngSearchResult[];
+}
+
 interface CachedLLMContext {
   grounding: LLMContextSnippet[];
   sources: Record<string, LLMContextSource>;
@@ -79,7 +95,7 @@ interface LLMContextDetails {
   errorKind?: string;
   error?: string;
   retryAfterMs?: number;
-  provider?: 'tavily' | 'brave' | 'ollama';
+  provider?: 'tavily' | 'brave' | 'searxng' | 'ollama';
 }
 
 // =============================================================================
@@ -270,6 +286,58 @@ async function executeOllamaLLMContext(
 }
 
 // =============================================================================
+// SearXNG LLM Context Execution
+// =============================================================================
+
+/**
+ * Execute a search_and_read query against a SearXNG instance.
+ *
+ * Uses SearXNG JSON results as lightweight snippets and runs them through
+ * budgetContent() to fit the token budget.
+ */
+async function executeSearxngLLMContext(
+  params: { query: string; maxTokens: number; count: number; threshold: string },
+  signal?: AbortSignal,
+): Promise<{ cached: CachedLLMContext; latencyMs: number; rateLimit?: RateLimitInfo }> {
+  const scoreThreshold = THRESHOLD_TO_SCORE[params.threshold] ?? 0.5;
+
+  const baseUrl = getSearxngBaseUrl();
+  const url = buildSearxngSearchUrl(baseUrl);
+  url.searchParams.set("q", params.query);
+  url.searchParams.set("format", "json");
+
+  const headers: Record<string, string> = {
+    "Accept": "application/json",
+  };
+  const apiKey = getSearxngApiKey();
+  if (apiKey) {
+    headers["X-API-Key"] = apiKey;
+  }
+
+  const timed = await fetchWithRetryTimed(url.toString(), {
+    method: "GET",
+    headers,
+    signal,
+  }, 2);
+
+  const data: SearxngSearchResponse = await timed.response.json();
+  const tavilyLikeResults: TavilyResult[] = (data.results ?? [])
+    .slice(0, params.count)
+    .filter((result) => !!result.url)
+    .map((result) => ({
+      title: result.title || "(untitled)",
+      url: result.url as string,
+      content: result.content || "",
+      score: typeof result.score === "number" ? result.score : 1.0,
+      published_date: result.publishedDate ?? result.published_date ?? null,
+    }));
+
+  const cached = budgetContent(tavilyLikeResults, params.maxTokens, scoreThreshold);
+
+  return { cached, latencyMs: timed.latencyMs, rateLimit: timed.rateLimit };
+}
+
+// =============================================================================
 // Tool Registration
 // =============================================================================
 
@@ -334,7 +402,7 @@ export function registerLLMContextTool(pi: ExtensionAPI) {
       const provider = resolveSearchProvider();
       if (!provider) {
         return {
-          content: [{ type: "text", text: "search_and_read unavailable: No search API key is set. Use secure_env_collect to set TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY." }],
+          content: [{ type: "text", text: "search_and_read unavailable: No search API key is set. Use secure_env_collect to set SEARXNG_BASE_URL, TAVILY_API_KEY, BRAVE_API_KEY, or OLLAMA_API_KEY." }],
           isError: true,
           details: { errorKind: "auth_error", error: "No search API key set" } satisfies Partial<LLMContextDetails>,
         };
@@ -397,6 +465,14 @@ export function registerLLMContextTool(pi: ExtensionAPI) {
           result = tavilyResult.cached;
           latencyMs = tavilyResult.latencyMs;
           rateLimit = tavilyResult.rateLimit;
+        } else if (provider === "searxng") {
+          const searxngResult = await executeSearxngLLMContext(
+            { query: params.query, maxTokens, count, threshold },
+            signal,
+          );
+          result = searxngResult.cached;
+          latencyMs = searxngResult.latencyMs;
+          rateLimit = searxngResult.rateLimit;
         } else if (provider === "ollama") {
           const ollamaResult = await executeOllamaLLMContext(
             { query: params.query, maxTokens, count, threshold },

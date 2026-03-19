@@ -156,11 +156,11 @@ export function validatePreferences(preferences: GSDPreferences): {
 
   // ─── Search Provider ─────────────────────────────────────────────
   if (preferences.search_provider !== undefined) {
-    const validSearchProviders = new Set(["brave", "tavily", "ollama", "native", "auto"]);
+    const validSearchProviders = new Set(["brave", "tavily", "searxng", "ollama", "native", "auto"]);
     if (typeof preferences.search_provider === "string" && validSearchProviders.has(preferences.search_provider)) {
       validated.search_provider = preferences.search_provider as GSDPreferences["search_provider"];
     } else {
-      errors.push(`search_provider must be one of: brave, tavily, ollama, native, auto`);
+      errors.push(`search_provider must be one of: brave, tavily, searxng, ollama, native, auto`);
     }
   }
 

@@ -196,8 +196,8 @@ export interface GSDPreferences {
   verification_commands?: string[];
   verification_auto_fix?: boolean;
   verification_max_retries?: number;
-  /** Search provider preference. "brave"/"tavily"/"ollama" force that backend and disable native Anthropic search. "native" forces native only. "auto" = current default behavior. */
-  search_provider?: "brave" | "tavily" | "ollama" | "native" | "auto";
+  /** Search provider preference. "brave"/"tavily"/"searxng"/"ollama" force that backend and disable native Anthropic search. "native" forces native only. "auto" = current default behavior. */
+  search_provider?: "brave" | "tavily" | "searxng" | "ollama" | "native" | "auto";
   /** Compression strategy for context that exceeds budget. "truncate" (default) drops sections, "compress" applies heuristic compression first. */
   compression_strategy?: CompressionStrategy;
   /** Context selection mode for file inlining. "full" inlines entire files, "smart" uses semantic chunking. Default derived from token profile. */
