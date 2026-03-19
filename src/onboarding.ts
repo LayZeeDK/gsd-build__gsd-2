@@ -638,8 +638,8 @@ async function runWebSearchStep(
         }
       },
     })
-    if (p.isCancel(baseUrl) || !(baseUrl as string)?.trim()) return null
-    const trimmedUrl = normalizeSearxngBaseUrl(baseUrl as string)
+    if (p.isCancel(baseUrl) || typeof baseUrl !== 'string' || !baseUrl.trim()) return null
+    const trimmedUrl = normalizeSearxngBaseUrl(baseUrl)
     authStorage.set('searxng', { type: 'api_key', key: trimmedUrl })
     process.env.SEARXNG_BASE_URL = trimmedUrl
 

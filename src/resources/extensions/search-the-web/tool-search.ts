@@ -8,6 +8,7 @@
  * - more_results_available from Brave response
  * - Adaptive snippet budget (fewer results = more snippets each)
  * - Rate limit info in details
+ * - SearXNG support for self-hosted web search
  */
 
 import type { ExtensionAPI } from "@gsd/pi-coding-agent";
